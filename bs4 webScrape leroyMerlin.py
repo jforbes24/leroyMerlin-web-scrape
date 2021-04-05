@@ -1,6 +1,7 @@
 import requests
 import bs4
 import lxml
+from lxml.html import fromstring
 import random
 import numpy as np
 import pandas as pd
@@ -10,11 +11,11 @@ import os
 
 # assign user-agent
 user_agent_list = [
-    'Mozilla/5.0 (Linux; Android 10; LM-X420) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.36', #blocked
-    'Mozilla/5.0 (Linux; Android 10; SM-A205U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.36', #open
-    'Mozilla/5.0 (X11; Linux i686; rv:85.0) Gecko/20100101 Firefox/85.0', #open
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.192 Safari/537.36',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.192 Safari/537.36'
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36',
+    'Mozilla/5.0 (Linux; Android 6.0.1; RedMi Note 5 Build/RB3N5C; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/68.0.3440.91 Mobile Safari/537.36'
     ]
 
 catLinks = []
@@ -29,6 +30,21 @@ for i in range(1,6):
     # set the headers
     headers = {'User-Agent' : user_agent}
 
+# create IP address pool for IP rotation - https://www.codementor.io/@scrapingdog/10-tips-to-avoid-getting-blocked-while-scraping-websites-16papipe62
+def get_proxies():
+    url = 'https://free-proxy-list.net/'
+    response = requests.get(url)
+    parser = fromstring(response.text)
+    proxies = set()
+    for i in parser.xpath('//tbody/tr')[:10]:
+        if i.xpath('.//td[7][contains(text(),"yes")]'):
+            #Grabbing IP and corresponding PORT
+            proxy = ":".join([i.xpath('.//td[1]/text()')[0], i.xpath('.//td[2]/text()')[0]])
+            proxies.add(proxy)
+    return proxies
+
+proxies = get_proxies()
+print(proxies)
 
 # get category pages
 baseurl = 'https://www.leroymerlin.fr/produits/'
@@ -130,11 +146,11 @@ except Exception as ex:
     print('Error: ', ex)
 """
 
-test = 'https://www.leroymerlin.fr/produits/electricite-domotique/alarme-camera-de-surveillance-et-detecteur-de-fumee/alarme-maison/accessoires-pour-alarme-de-maison/support-mural-pour-camera-somfy-79355052.html'
+test = 'https://www.leroymerlin.fr/produits/electricite-domotique/alarme-camera-de-surveillance-et-detecteur-de-fumee/alarme-maison/accessoires-pour-alarme-de-maison/pile-baton-lithium-3-6v-saft-pour-alarme-80138989.html'
 try:
-    for link in range(1,2): #productLinks
+    for link in range(1): #productLinks
         # get product attributes
-        result = requests.get(test, headers=headers)
+        result = requests.get(test, proxies=proxies, headers=headers)
         soup = bs4.BeautifulSoup(result.content, 'lxml')
         products = soup.find('div', id_='corps')
 
@@ -153,9 +169,18 @@ try:
             name = 'na'
 
         # get brand
-        brand = 'na'
-
-                
+        try:
+            all_tr = soup.find_all('tr', class_='m-product-attr-row')
+            for row in all_tr:
+                all_th = row.find_all('th', recursive=False)
+                brand = row.find('scope', row='Marque du produit').text.strip()
+                print(brand)
+                for i in all_th:
+                    print(i)
+            # brand = soup.find('div', class_='o-product-detail-description__images col-s-12 col-m-10 col-start-m-2 col-l-8 col-start-l-3').text.strip()
+        except:
+            brand = 'na'
+ 
         # get category
         try:
             category = soup.select('#component-breadcrumb')[0].find_all('li')[2].text.strip()
@@ -242,7 +267,7 @@ try:
 
         # add to cart
         try:
-            add2Cart = soup.find('span', class_='mc-button__label').text.strip()
+            add2Cart = soup.find('button', class_='mc-button a-add-to-cart js-cart-add a-add-to-cart mc-button--l mc-button--full').text.strip()
         except:
             add2Cart = 'na'
 
@@ -251,7 +276,7 @@ try:
             sku = {'sku' : sku,
                    'description' : name,
                    'price' : price,
-                   'brand' : brand,
+                   #'brand' : brand,
                    'category' : category,
                    'subCat' : subCat,
                    'subSubCat' : subSubCat,
@@ -264,7 +289,8 @@ try:
                    'deliveryCharge' : deliveryCharge,
                    'leadTime' : leadTime,
                    'images' : images,
-                   'add2Cart' : add2Cart
+                   'add2Cart' : add2Cart,
+                   'link' : link
                    }
             if sku in productData:
                 continue
@@ -273,7 +299,7 @@ try:
         except Exception as ex:
             print('Error: ', ex)
 
-        time.sleep(0.5)
+        time.sleep(2)
 
         print(len(productData))
               
