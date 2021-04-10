@@ -22,6 +22,7 @@ subCatLinks = []
 brickLinks = []
 productLinks = []
 nestedLinks = []
+productData = []
 
 # pick a random user agent
 for i in range(1,6):
@@ -233,7 +234,7 @@ try:
         soup = bs4.BeautifulSoup(r.content, 'lxml')
         products = soup.find('div', id_='corps')
 
-        productData = []
+        # productData = []
 
         # get SKU
         try:
