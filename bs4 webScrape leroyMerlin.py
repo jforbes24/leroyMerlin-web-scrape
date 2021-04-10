@@ -1,7 +1,6 @@
 import requests
 import bs4
 import lxml
-from lxml.html import fromstring
 import random
 import numpy as np
 import pandas as pd
@@ -23,6 +22,7 @@ subCatLinks = []
 brickLinks = []
 productLinks = []
 nestedLinks = []
+productData = []
 
 # pick a random user agent
 for i in range(1,6):
@@ -31,70 +31,150 @@ for i in range(1,6):
     headers = {'User-Agent' : user_agent}
 
 # create IP address pool for IP rotation - https://www.codementor.io/@scrapingdog/10-tips-to-avoid-getting-blocked-while-scraping-websites-16papipe62
-def get_proxies():
-    url = 'https://free-proxy-list.net/'
-    response = requests.get(url)
-    parser = fromstring(response.text)
-    proxies = set()
-    for i in parser.xpath('//tbody/tr')[:10]:
-        if i.xpath('.//td[7][contains(text(),"yes")]'):
-            #Grabbing IP and corresponding PORT
-            proxy = ":".join([i.xpath('.//td[1]/text()')[0], i.xpath('.//td[2]/text()')[0]])
-            proxies.add(proxy)
-    return proxies
+ 
+#get the list of free proxies
 
-proxies = get_proxies()
-print(proxies)
+try:
+
+    import requests
+    from bs4 import BeautifulSoup
+    import random
+
+except:
+    print(" Library Not Found !")
+
+
+class Random_Proxy(object):
+
+    def __init__(self):
+        self.__url = 'https://www.sslproxies.org/'
+        self.__headers = {
+            'Accept-Encoding': 'gzip, deflate, sdch',
+            'Accept-Language': 'en-US,en;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Referer': 'http://www.wikipedia.org/',
+            'Connection': 'keep-alive',
+            }
+        self.random_ip = []
+        self.random_port = []
+
+    def __random_proxy(self):
+
+        """
+        This is Private Function Client Should not have accesss
+        :return: Dictionary object of Random proxy and port number
+        """
+
+        r = requests.get(url=self.__url, headers=self.__headers)
+        soup = BeautifulSoup(r.text, 'html.parser')
+
+        # Get the Random IP Address
+        for x in soup.findAll('td')[::8]:
+            self.random_ip.append(x.get_text())
+
+        # Get Their Port
+        for y in soup.findAll('td')[1::8]:
+            self.random_port.append(y.get_text())
+
+        # Zip together
+        z = list(zip(self.random_ip, self.random_port))
+
+        # This will Fetch Random IP Address and corresponding PORT Number
+        number = random.randint(0, len(z)-50)
+        ip_random = z[number]
+
+        # convert Tuple into String and formart IP and PORT Address
+        ip_random_string = "{}:{}".format(ip_random[0],ip_random[1])
+
+        # Create a Proxy
+        proxy = {'https':ip_random_string}
+
+        # return Proxy
+        return proxy
+
+    def Proxy_Request(self,request_type='get',url='',**kwargs):
+        """
+
+        :param request_type: GET, POST, PUT
+        :param url: URL from which you want to do webscrapping
+        :param kwargs: any other parameter you pass
+        :return: Return Response
+        """
+        while True:
+            try:
+                proxy = self.__random_proxy()
+                print("Using Proxy {}".format(proxy))
+                r = requests.request(request_type,url,proxies=proxy,headers=self.__headers ,timeout=8, **kwargs)
+                return r
+                break
+            except:
+                pass
+
+# Create a class
+proxy = Random_Proxy()
+
+url = 'https://www.leroymerlin.fr/produits'
+request_type = "get"
+
+r = proxy.Proxy_Request(url=url, request_type=request_type, cookies={'region': 'eyJpdiI6IlN1SUhieDhmUGtxbDVzcHIyZVgrSUE9PSIsInZhbHVlIjoiZHhycHE0MGRlVWNkNHk0U2NDSCtCZz09IiwibWFjIjoiMmFiMjVhZTFjMjFhNWU4NzkyZmFiNTUxOGM5MWYzMmIzYmJiYzNkMDk4NDJjYWFiYTdkNDVjNjMzYzVjNWNhMCJ9'})
+print(r)
+
+
 
 # get category pages
-baseurl = 'https://www.leroymerlin.fr/produits/'
 urlConcat = 'https://www.leroymerlin.fr'
 
-"""
 
-result = requests.get(baseurl, headers=headers)
-soup = bs4.BeautifulSoup(result.content, 'lxml')
-catGrid = soup.find('ul', class_='col-container l-taxonomy l-taxonomy--wide')
-print(result.status_code)
+
+# result = requests.get(baseurl, headers=headers)
+soup = bs4.BeautifulSoup(r.content, 'lxml')
+catGrid = soup.find('ul', class_='col-container l-childrencategories l-childrencategories--wide')
+
 
 
 
 # get category links
 try:
-    for cat in catGrid.find_all('a', class_='l-taxonomy-item-designation__link'):
+    for cat in catGrid.find_all('a', class_='l-childrencategories-item-designation__link l-childrencategories-item-designation__link--wide'):
         catLinks.append(urlConcat + cat['href'])
-        time.sleep(0.5)
-    print(len(catLinks))
+        time.sleep(1)
+    print(catLinks)
 except Exception as ex:
     print('Error in Category: ', ex)
+
+
 
 # get sub-category links
 try:
     for subCatGrid in catLinks:
-        result = requests.get(subCatGrid, headers=headers)
-        broth = bs4.BeautifulSoup(result.content, 'lxml')
-        for subCat in broth.find_all('a', class_='l-taxonomy-item-designation__link'):
+        r = proxy.Proxy_Request(url=subCatGrid, request_type=request_type, cookies={'region': 'eyJpdiI6IlN1SUhieDhmUGtxbDVzcHIyZVgrSUE9PSIsInZhbHVlIjoiZHhycHE0MGRlVWNkNHk0U2NDSCtCZz09IiwibWFjIjoiMmFiMjVhZTFjMjFhNWU4NzkyZmFiNTUxOGM5MWYzMmIzYmJiYzNkMDk4NDJjYWFiYTdkNDVjNjMzYzVjNWNhMCJ9'})
+        broth = bs4.BeautifulSoup(r.content, 'lxml')
+        for subCat in broth.find_all('a', class_='l-childrencategories-item-designation__link l-childrencategories-item-designation__link--grid'):
             if urlConcat + subCat['href'] in subCatLinks:
                 continue
             else:
                 subCatLinks.append(urlConcat + subCat['href'])
                 print(len(subCatLinks))
-                time.sleep(0.5)
+                print(urlConcat + subCat['href'])
+                time.sleep(1)
 except Exception as ex:
     print('Error in Sub-Category: ', ex)
 
+    
 # get brick links
 try:
     for brickGrid in subCatLinks:
-        result = requests.get(brickGrid, headers=headers)
-        stew = bs4.BeautifulSoup(result.content, 'lxml')
-        for brick in stew.find_all('a', class_='l-taxonomy-item-designation__link'):
+        r = proxy.Proxy_Request(url=brickGrid, request_type=request_type, cookies={'region': 'eyJpdiI6IlN1SUhieDhmUGtxbDVzcHIyZVgrSUE9PSIsInZhbHVlIjoiZHhycHE0MGRlVWNkNHk0U2NDSCtCZz09IiwibWFjIjoiMmFiMjVhZTFjMjFhNWU4NzkyZmFiNTUxOGM5MWYzMmIzYmJiYzNkMDk4NDJjYWFiYTdkNDVjNjMzYzVjNWNhMCJ9'})
+        stew = bs4.BeautifulSoup(r.content, 'lxml')
+        for brick in stew.find_all('a', class_='l-childrencategories-item-designation__link l-childrencategories-item-designation__link--grid'):
             if urlConcat + brick['href'] in brickLinks:
                 continue
             else:
                 brickLinks.append(urlConcat + brick['href'])
+                print(len(brickLinks))
                 print(urlConcat + brick['href'])
-                time.sleep(0.5)
+                time.sleep(1)
 except Exception as ex:
     print('Error in Bricks: ', ex)
 
@@ -103,21 +183,20 @@ except Exception as ex:
 # get nested links
 
 try:
-    for nextPage in range(1): # brickLinks
-        test = 'https://www.leroymerlin.fr/produits/electricite-domotique/alarme-camera-de-surveillance-et-detecteur-de-fumee/camera-de-surveillance/'
-        result = requests.get(test, headers=headers)
-        broth = bs4.BeautifulSoup(result.content, 'lxml')
+    for nextPage in brickLinks:
+        r = proxy.Proxy_Request(url=nextPage, request_type=request_type, cookies={'region': 'eyJpdiI6IlN1SUhieDhmUGtxbDVzcHIyZVgrSUE9PSIsInZhbHVlIjoiZHhycHE0MGRlVWNkNHk0U2NDSCtCZz09IiwibWFjIjoiMmFiMjVhZTFjMjFhNWU4NzkyZmFiNTUxOGM5MWYzMmIzYmJiYzNkMDk4NDJjYWFiYTdkNDVjNjMzYzVjNWNhMCJ9'})
+        broth = bs4.BeautifulSoup(r.content, 'lxml')
         print(result.status_code)
         # get nested page links
         try:
-            for urlLink in broth.find_all('div', class_='mc-pagination js-pagination m-list-pagination'):
+            for urlLink in broth.find_all('div', class_='mc-pagination__button   js-next'):
                 nestedLink = urlLink.find_all('a', href=True)
                 if urlConcat + nestedLink[1]['href'] in brickLinks:
                     continue
                 else:
                     brickLinks.append(urlConcat + nestedLink[1]['href'])
                     print(urlConcat + nestedLink[1]['href'])
-                    time.sleep(0.5)
+                    time.sleep(1)
               
         except Exception as ex:
             print('Error in Nested Page Link: ', ex)
@@ -129,32 +208,32 @@ except Exception as ex:
 
 try:
     for product in brickLinks:
-        result = requests.get(product, headers=headers)
-        soup = bs4.BeautifulSoup(result.content, 'lxml')
+        r = proxy.Proxy_Request(url=product, request_type=request_type, cookies={'region': 'eyJpdiI6IlN1SUhieDhmUGtxbDVzcHIyZVgrSUE9PSIsInZhbHVlIjoiZHhycHE0MGRlVWNkNHk0U2NDSCtCZz09IiwibWFjIjoiMmFiMjVhZTFjMjFhNWU4NzkyZmFiNTUxOGM5MWYzMmIzYmJiYzNkMDk4NDJjYWFiYTdkNDVjNjMzYzVjNWNhMCJ9'})
+        soup = bs4.BeautifulSoup(r.content, 'lxml')
         products = soup.find_all('article', class_='kl-tile kl-tile--h-to-v')
 
         # get product links
         for item in products:
             for link in item.find_all('a', href=True):
-                if baseurl + link['href'] not in productLinks:
-                    productLinks.append(baseurl + link['href'])
+                if urlConcat + link['href'] not in productLinks:
+                    productLinks.append(urlConcat + link['href'])
                 else:
                     continue
                 print(len(productLinks))
-                time.sleep(0.5)
+                time.sleep(1)
 except Exception as ex:
     print('Error: ', ex)
-"""
 
-test = 'https://www.leroymerlin.fr/produits/electricite-domotique/alarme-camera-de-surveillance-et-detecteur-de-fumee/alarme-maison/accessoires-pour-alarme-de-maison/pile-baton-lithium-3-6v-saft-pour-alarme-80138989.html'
+
+
 try:
-    for link in range(1): #productLinks
+    for link in productLinks:
         # get product attributes
-        result = requests.get(test, proxies=proxies, headers=headers)
-        soup = bs4.BeautifulSoup(result.content, 'lxml')
+        r = proxy.Proxy_Request(url=link, request_type=request_type, cookies={'region': 'eyJpdiI6IlN1SUhieDhmUGtxbDVzcHIyZVgrSUE9PSIsInZhbHVlIjoiZHhycHE0MGRlVWNkNHk0U2NDSCtCZz09IiwibWFjIjoiMmFiMjVhZTFjMjFhNWU4NzkyZmFiNTUxOGM5MWYzMmIzYmJiYzNkMDk4NDJjYWFiYTdkNDVjNjMzYzVjNWNhMCJ9'})
+        soup = bs4.BeautifulSoup(r.content, 'lxml')
         products = soup.find('div', id_='corps')
 
-        productData = []
+        # productData = []
 
         # get SKU
         try:
@@ -299,7 +378,7 @@ try:
         except Exception as ex:
             print('Error: ', ex)
 
-        time.sleep(2)
+        time.sleep(1)
 
         print(len(productData))
               
@@ -307,7 +386,6 @@ except Exception as ex:
     print('Error: ', ex)
 
 
-print(result.status_code)
 # create dataframe
 df = pd.DataFrame(productData)
 
@@ -317,7 +395,6 @@ pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.width', 1000)
 
 # save to excel
-df.to_excel(r'C:\\Users\\forbej06\\OneDrive - Kingfisher PLC\\dev\\Range\\Leroy Merlin\\bs4leroyMerlin.xlsx')
+df.to_excel(r'C:\Users\forbej06\OneDrive - Kingfisher PLC\dev\Range\Leroy Merlin\bs4leroyMerlin.xlsx', sheet_name='leroyMerlin', index=False, header=True)
 
 print(df)
-
